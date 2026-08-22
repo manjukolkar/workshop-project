@@ -1,0 +1,25 @@
+replicaCount: 1
+
+image:
+  repository: YOUR_DOCKER_IMAGE
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+
+ingress:
+  enabled: true
+  className: nginx
+  host: preview.example.com
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+  limits:
+    cpu: 250m
+    memory: 256Mi

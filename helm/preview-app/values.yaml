@@ -1,9 +1,14 @@
+app:
+  name: preview-app
+
 replicaCount: 1
+
+prNumber: ""
 
 image:
   repository: 182790204459.dkr.ecr.us-east-1.amazonaws.com/workshop-preview-app
   tag: latest
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
 
 service:
   type: ClusterIP
@@ -13,7 +18,15 @@ service:
 ingress:
   enabled: true
   className: alb
+
   host: ""
+
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+
+    # All PR preview environments share this ALB
+    alb.ingress.kubernetes.io/group.name: preview-environments
 
 resources:
   requests:

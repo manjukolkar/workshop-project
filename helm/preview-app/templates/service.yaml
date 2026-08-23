@@ -2,13 +2,13 @@ apiVersion: v1
 kind: Service
 
 metadata:
-  name: preview-app
+  name: {{ .Values.app.name }}
 
 spec:
   type: {{ .Values.service.type }}
 
   selector:
-    app: preview-app
+    app: {{ .Values.app.name }}
 
   ports:
     - protocol: TCP

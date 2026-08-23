@@ -9,7 +9,7 @@ app.get("/", (req, res) => {
   res.send(`
     <h1>🚀 Ephemeral Preview Environment</h1>
     <p>Running in PR environment: <b>pr-${prNumber}</b></p>
-    <p>This is our GitOps workshop application.</p>
+    <p>This is our GitOps workshop application - PR 2.</p>
   `);
 });
 

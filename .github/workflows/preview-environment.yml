@@ -1,0 +1,158 @@
+name: Preview Environment
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - closed
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: workshop-preview-app
+  EKS_CLUSTER_NAME: workshop-eks
+
+jobs:
+
+  build-and-push:
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+
+    outputs:
+      image_tag: pr-${{ github.event.pull_request.number }}
+
+    steps:
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and Push Docker image
+        env:
+          IMAGE_TAG: pr-${{ github.event.pull_request.number }}
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker build \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            ./app
+
+          docker push \
+            $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+
+  deploy-preview:
+
+    needs: build-and-push
+
+    if: github.event.action != 'closed'
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig \
+            --region $AWS_REGION \
+            --name $EKS_CLUSTER_NAME
+
+
+      - name: Create Preview Application
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+
+          cat <<EOF | kubectl apply -f -
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: preview-pr-$PR_NUMBER
+            namespace: argocd
+          spec:
+            project: default
+
+            source:
+              repoURL: https://github.com/manjukolkar/workshop-project.git
+              targetRevision: ${{ github.event.pull_request.head.sha }}
+              path: helm/preview-app
+
+              helm:
+                parameters:
+                  - name: prNumber
+                    value: "$PR_NUMBER"
+
+                  - name: image.tag
+                    value: "pr-$PR_NUMBER"
+
+                  - name: ingress.host
+                    value: "pr-$PR_NUMBER.preview.example.com"
+
+            destination:
+              server: https://kubernetes.default.svc
+              namespace: pr-$PR_NUMBER
+
+            syncPolicy:
+              automated:
+                prune: true
+                selfHeal: true
+
+              syncOptions:
+                - CreateNamespace=true
+          EOF
+
+
+  cleanup-preview:
+
+    if: github.event.action == 'closed'
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig \
+            --region $AWS_REGION \
+            --name $EKS_CLUSTER_NAME
+
+      - name: Delete Argo CD Application
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+
+          kubectl delete application \
+            preview-pr-$PR_NUMBER \
+            -n argocd \
+            --ignore-not-found
+
+          kubectl delete namespace \
+            pr-$PR_NUMBER \
+            --ignore-not-found

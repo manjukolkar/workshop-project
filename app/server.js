@@ -7,7 +7,7 @@ const prNumber = process.env.PR_NUMBER || "local";
 
 app.get("/", (req, res) => {
   res.send(`
-    <h1>🚀 Ephemeral Preview Environment</h1>
+    <h1>🚀 Ephemeral Preview Environment is Working!</h1>
     <p>Running in PR environment: <b>pr-${prNumber}</b></p>
     <p>This is our GitOps workshop application.</p>
   `);

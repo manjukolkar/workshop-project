@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: YOUR_DOCKER_IMAGE
+  repository: 182790204459.dkr.ecr.us-east-1.amazonaws.com/workshop-preview-app
   tag: latest
   pullPolicy: IfNotPresent
 
